@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "distributed_data_sync",
+      "value": "允许应用在多设备间同步游戏数据，实现跨设备游戏接续"
     }
   ]
 }

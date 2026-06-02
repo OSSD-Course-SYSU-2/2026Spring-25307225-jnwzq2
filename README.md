@@ -1,219 +1,202 @@
-# 技能五子棋 (JNWZQ)
+# 五子棋游戏 (Gomoku Game)
 
-一款基于 HarmonyOS 开发的创新五子棋游戏，融入了独特的技能卡牌系统，为经典五子棋增添了策略深度和趣味性。
+一个基于 HarmonyOS 开发的五子棋游戏，支持跨设备协同和无缝流转体验。
 
 ## 项目简介
 
-本项目是一个运行在 HarmonyOS 平台上的五子棋对战游戏。除了传统的黑白双方轮流落子玩法外，还引入了**能量系统**和**技能卡牌机制**，让游戏策略更加丰富多变。
+本项目是一个完整的五子棋游戏应用，集成了 HarmonyOS 的分布式能力，实现了"一次开发多端部署"和"自由流转"两大核心特性。玩家可以在手机、平板、PC 等多种设备上无缝切换游戏，享受一致的游戏体验。
 
-### 核心特色
+## 核心功能
 
-- 🎮 **经典玩法**：15×15 标准棋盘，黑白双方对战
-- ⚡ **能量系统**：每落一子获得 1 点能量（上限 5 点）
-- 🃏 **技能卡牌**：三种独特技能，扭转战局
-- 🎨 **精美界面**：HarmonyOS 原生 UI，流畅交互体验
+### 🎮 游戏功能
+- **经典五子棋玩法**：双人对战，先连成五子者获胜
+- **技能卡牌系统**：
+  - 飞沙走石 (4能量)：移除任意棋子
+  - 镜花水月 (2能量)：放置幻影棋子
+  - 画地为牢 (2能量)：封锁位置3回合
+- **能量系统**：每落一子获得1点能量，用于释放技能
 
-## 技能卡牌介绍
+### 📱 一次开发多端部署
 
-| 技能名称 | 能量消耗 | 效果描述 |
-|---------|---------|---------|
-| **镜花水月** | 5 点 | 放置幻影棋子，2 回合后消失，期间参与胜利判定 |
-| **飞沙走石** | 4 点 | 移除棋盘上任意一颗棋子 |
-| **画地为牢** | 2 点 | 封锁指定空位 3 回合，期间不可落子 |
+本项目实现了完整的"一次开发多端部署"能力，支持以下设备类型：
+- **手机 (Phone)**：优化的移动端体验
+- **平板 (Tablet)**：适配大屏幕显示
+- **PC/2in1**：桌面级交互体验
 
-### 技能使用策略
+#### 技术实现
+1. **多设备配置**
+   - 在 `module.json5` 中配置支持多种设备类型
+   - 使用响应式布局适配不同屏幕尺寸
 
-- **镜花水月**：可用于快速形成连线或干扰对手判断，但需注意幻影棋子会消失
-- **飞沙走石**：移除对手关键棋子，破坏其连势，或移除自己的失误落子
-- **画地为牢**：封锁战略要地，限制对手落子选择
+2. **断点系统**
+   - 实现了完整的断点机制（SM/MD/LG）
+   - 根据屏幕宽度自动调整UI布局
+   - 文件：`entry/src/main/ets/common/BreakpointSystem.ets`
 
-## 技术架构
+3. **设备适配**
+   - 自动检测设备类型
+   - 根据设备特性调整棋盘大小、字体大小等
+   - 文件：`entry/src/main/ets/common/DeviceAdapter.ets`
 
-### 开发环境
+### 🔄 自由流转
 
-- **开发框架**：HarmonyOS Native (ArkUI)
-- **开发语言**：ArkTS (TypeScript 扩展)
-- **目标 SDK**：HarmonyOS 6.0.2 (API 22)
-- **构建工具**：Hvigor
-- **测试框架**：Hypium + Hamock
+实现了 HarmonyOS 的分布式流转能力，支持跨设备无缝游戏体验：
 
-### 项目结构
+#### 应用接续
+- **游戏状态保存**：自动保存当前游戏进度
+- **跨设备恢复**：在其他设备上继续当前游戏
+- **无缝切换**：游戏进度、棋盘状态完整同步
+
+#### 技术实现
+1. **应用接续配置**
+   - 在 `module.json5` 中启用 `continuable: true`
+   - 实现 `onContinue` 方法保存游戏状态
+   - 在 `onCreate` 中处理接续恢复逻辑
+
+2. **分布式权限**
+   - 配置 `ohos.permission.DISTRIBUTED_DATASYNC` 权限
+   - 支持跨设备数据同步
+
+3. **流转管理**
+   - 设备发现与管理
+   - 游戏状态同步
+   - 文件：`entry/src/main/ets/common/DistributedGameManager.ets`
+
+## 项目结构
 
 ```
-jnwzq/
-├── AppScope/                 # 应用全局配置
-│   └── app.json5            # 应用配置（包名、版本等）
-├── entry/                   # 主模块
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── ets/
-│   │   │   │   ├── entryability/      # 应用入口
-│   │   │   │   │   └── EntryAbility.ets
-│   │   │   │   └── pages/             # 页面组件
-│   │   │   │       ├── Index.ets      # 主页（游戏入口）
-│   │   │   │       ├── GomokuGame.ets # 游戏主界面
-│   │   │   │       └── TestGomoku.ets # 测试页面
-│   │   │   └── module.json5           # 模块配置
-│   │   └── test/                      # 测试代码
-│   └── build-profile.json5            # 模块构建配置
-├── build-profile.json5      # 应用构建配置
-├── oh-package.json5         # 依赖管理
-└── hvigorfile.ts           # 构建脚本
+entry/src/main/
+├── ets/
+│   ├── common/                    # 公共工具类
+│   │   ├── BreakpointSystem.ets   # 断点系统
+│   │   ├── DeviceAdapter.ets      # 设备适配工具
+│   │   └── DistributedGameManager.ets  # 分布式流转管理
+│   ├── entryability/
+│   │   └── EntryAbility.ets       # 应用入口（含接续逻辑）
+│   └── pages/
+│       ├── Index.ets              # 主页面
+│       ├── GomokuGame.ets         # 游戏主界面
+│       └── TestGomoku.ets         # 测试页面
+├── resources/                      # 资源文件
+└── module.json5                   # 模块配置（含多设备支持）
 ```
 
-### 核心技术实现
+## 技术特性
 
-#### 1. 状态管理
+### 1. 响应式布局
+- 使用 `GridRow` / `GridCol` 实现栅格布局
+- 断点范围：
+  - SM: 320vp - 600vp (手机)
+  - MD: 600vp - 840vp (折叠屏/小平板)
+  - LG: 840vp+ (平板/PC)
 
-使用 `@State` 装饰器实现响应式状态管理：
+### 2. 设备能力适配
+- 自动检测设备类型
+- 动态调整UI元素尺寸
+- 优化不同设备的交互体验
 
+### 3. 分布式能力
+- **应用接续**：跨设备无缝切换
+- **设备发现**：自动发现组网设备
+- **状态同步**：游戏进度实时同步
+
+## 使用说明
+
+### 环境要求
+- HarmonyOS SDK API 12+
+- DevEco Studio 4.0+
+- 支持的设备：手机、平板、PC/2in1
+
+### 安装运行
+1. 使用 DevEco Studio 打开项目
+2. 连接 HarmonyOS 设备或启动模拟器
+3. 点击运行按钮安装应用
+
+### 跨设备流转
+1. 确保两台设备登录同一华为账号
+2. 开启设备的 Wi-Fi 和蓝牙
+3. 在一台设备上开始游戏
+4. 点击设备的流转图标或使用系统流转功能
+5. 选择目标设备完成游戏接续
+
+## 更新日志
+
+### v1.1.0 (2026-06-02)
+#### 新增功能
+- ✨ 实现一次开发多端部署能力
+  - 支持手机、平板、PC 三种设备类型
+  - 实现响应式布局和断点系统
+  - 添加设备自动适配功能
+  
+- ✨ 实现自由流转功能
+  - 支持应用接续，跨设备无缝切换游戏
+  - 实现游戏状态自动保存和恢复
+  - 添加分布式设备发现和管理
+  
+- 📝 完善项目文档
+  - 新增详细的 README 文档
+  - 说明多端部署和流转功能使用方法
+
+#### 技术改进
+- 🔧 优化 module.json5 配置，支持多设备类型
+- 🔧 添加分布式数据同步权限
+- 🎨 实现断点系统和设备适配工具类
+- 🚀 集成 HarmonyOS 分布式能力
+
+### v1.0.0 (初始版本)
+- 基础五子棋游戏功能
+- 技能卡牌系统
+- 能量系统
+
+## 开发指南
+
+### 扩展断点系统
 ```typescript
-@State chessBoard: number[][] = [];      // 棋盘状态
-@State currentPlayer: number = 1;        // 当前玩家
-@State energy: number[] = [0, 0];        // 双方能量值
-@State gameMode: string = 'normal';      // 游戏模式
+import { BreakpointSystem, BreakpointType } from '../common/BreakpointSystem';
+
+// 创建断点系统实例
+const breakpointSystem = new BreakpointSystem();
+breakpointSystem.register();
+
+// 监听断点变化
+breakpointSystem.onBreakpointChange((breakpoint: BreakpointType) => {
+  // 根据断点调整布局
+});
 ```
 
-#### 2. 棋盘渲染
-
-采用 `ForEach` 循环渲染棋盘网格：
-
+### 使用设备适配
 ```typescript
-ForEach([0, 1, 2, ...], (row: number) => {
-  Row() {
-    ForEach([0, 1, 2, ...], (col: number) => {
-      // 渲染棋盘格子
-    })
-  }
-})
+import { DeviceAdapter, DeviceType } from '../common/DeviceAdapter';
+
+const deviceAdapter = DeviceAdapter.getInstance();
+
+// 获取推荐的棋盘大小
+const boardSize = deviceAdapter.getRecommendedBoardSize();
+
+// 判断设备类型
+if (deviceAdapter.isTablet()) {
+  // 平板特定逻辑
+}
 ```
 
-#### 3. 胜负判定
-
-支持包含幻影棋子的连珠判定，检查四个方向（水平、垂直、两条对角线）。
-
-#### 4. 技能系统
-
-通过 `gameMode` 状态切换不同的点击处理逻辑：
-
-- `normal`：正常落子
-- `skill_fly`：飞沙走石（移除棋子）
-- `skill_mirror`：镜花水月（放置幻影）
-- `skill_prison`：画地为牢（封锁位置）
-
-## 安装与运行
-
-### 前置要求
-
-- DevEco Studio 4.0 或更高版本
-- HarmonyOS SDK 6.0.2 (API 22)
-- Node.js 14.x 或更高版本
-
-### 构建步骤
-
-1. **克隆项目**
-   ```bash
-   git clone <项目地址>
-   cd jnwzq
-   ```
-
-2. **安装依赖**
-   ```bash
-   ohpm install
-   ```
-
-3. **打开项目**
-   - 使用 DevEco Studio 打开项目目录
-   - 等待项目初始化完成
-
-4. **运行应用**
-   - 连接 HarmonyOS 设备或启动模拟器
-   - 点击运行按钮或使用快捷键 `Shift + F10`
-
-### 构建命令
-
-```bash
-# 调试构建
-hvigorw assembleHap --mode module -p product=default
-
-# 发布构建
-hvigorw assembleHap --mode module -p product=default -p buildMode=release
-```
-
-## 游戏规则
-
-### 基本规则
-
-1. 黑方先手，双方轮流落子
-2. 每落一子获得 1 点能量，能量上限为 5 点
-3. 先在横、竖、斜方向连成五子者获胜
-4. 使用技能会消耗对应能量，并强制结束当前回合
-
-### 特殊规则
-
-- **幻影棋子**：可参与连珠判定，但 2 回合后会消失
-- **禁地**：被封锁的位置在 3 回合内无法落子
-- **技能使用**：使用技能后立即切换回合，对手获得行动权
-
-## 开发说明
-
-### 扩展技能
-
-如需添加新技能，在 `GomokuGame.ets` 中：
-
-1. 在 `skills` 数组中添加技能定义：
-   ```typescript
-   { name: '新技能', cost: 3, mode: 'skill_new', desc: '技能描述' }
-   ```
-
-2. 在 `onGridClick` 方法中添加处理分支：
-   ```typescript
-   case 'skill_new':
-     this.handleSkillNew(row, col);
-     break;
-   ```
-
-3. 实现具体的技能处理方法 `handleSkillNew`
-
-### 自定义棋盘
-
-修改以下常量可自定义棋盘：
-
+### 实现流转功能
 ```typescript
-private readonly BOARD_SIZE: number = 15;  // 棋盘大小
-private readonly CELL_SIZE: number = 24;   // 格子大小
-private readonly BOARD_COLOR: string = '#DEB887'; // 棋盘颜色
+// 在 Ability 中实现接续
+onContinue(wantParam: Record<string, Object>): AbilityConstant.OnContinueResult {
+  // 保存游戏状态
+  wantParam['gameState'] = JSON.stringify(currentGameState);
+  return AbilityConstant.OnContinueResult.AGREE;
+}
 ```
-
-## 版本历史
-
-### v1.0.0 (当前版本)
-
-- ✅ 实现基础五子棋玩法
-- ✅ 集成能量系统
-- ✅ 实现三种技能卡牌
-- ✅ 添加幻影棋子和禁地机制
-- ✅ 优化 UI 交互体验
 
 ## 贡献指南
 
-欢迎提交 Issue 和 Pull Request 来改进项目！
-
-### 开发建议
-
-1. 遵循 ArkTS 编码规范
-2. 使用 `@State` 管理响应式状态
-3. 保持组件职责单一
-4. 添加必要的日志输出便于调试
+欢迎提交 Issue 和 Pull Request 来帮助改进项目。
 
 ## 许可证
 
-本项目仅供学习和研究使用。
+MIT License
 
 ## 联系方式
 
-如有问题或建议，欢迎通过 Issue 与我们交流。
-
----
-
-**Enjoy the game! 🎮**
+如有问题或建议，请通过 Issue 与我们联系。
