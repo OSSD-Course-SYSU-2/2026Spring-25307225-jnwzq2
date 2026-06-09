@@ -1,7 +1,3 @@
 {
-  "src": [
-    "pages/Index",
-    "pages/GomokuGame",
-    "pages/TestGomoku"
-  ]
+  "src" : [ "generated/Index", "pages/Index", "pages/GomokuGame", "pages/TestGomoku" ]
 }

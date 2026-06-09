@@ -1,3 +1,5 @@
+import router from '@ohos.router';
+
 // 技能卡牌类型定义
 interface SkillCard {
   name: string;
@@ -11,9 +13,9 @@ interface SkillCard {
 struct GomokuGame {
   // 棋盘常量
   private readonly BOARD_SIZE: number = 15; // 15x15 棋盘
-  private readonly CELL_SIZE: number = 24;  // 每个格子大小（适配手机屏幕）
+  private readonly CELL_SIZE: number = 22;  // 每个格子大小（适配手机屏幕）
   private readonly BOARD_COLOR: string = '#DEB887'; // 木纹色
-  private readonly GRID_COLOR: string = '#000000';  // 黑色网格线
+  private readonly GRID_COLOR: string = '#8B4513';  // 棕色网格线
   
   // 游戏状态
   @State chessBoard: number[][] = []; // 棋盘数组 0:空 1:黑棋 2:白棋 3:幻影 4:禁地
@@ -23,22 +25,33 @@ struct GomokuGame {
   @State message: string = '黑方落子';
   @State gameOver: boolean = false;
   @State winner: number = 0;
+  @State isSkillMode: boolean = true; // 是否为技能模式（true:技能版 false:普通版）
   
   // 技能卡牌数据
   private readonly skills: SkillCard[] = [
-    { name: '镜花水月', cost: 5, mode: 'skill_mirror', desc: '放置幻影棋子，2回合后消失，参与胜利判定' },
+    { name: '镜花水月', cost: 5, mode: 'skill_mirror', desc: '放置幻影棋子，3回合后消失，参与胜利判定' },
     { name: '飞沙走石', cost: 4, mode: 'skill_fly', desc: '移除任意一颗棋子' },
     { name: '画地为牢', cost: 2, mode: 'skill_prison', desc: '封锁空位3回合' }
   ];
   
   // 禁地倒计时记录
   private forbiddenMap: Map<string, number> = new Map();
-  // 幻影棋子倒计时记录（2回合后消失）
+  // 幻影棋子倒计时记录（3回合后消失）
   private phantomMap: Map<string, number> = new Map();
   
   // 初始化棋盘
   aboutToAppear(): void {
     console.log('GomokuGame 组件初始化');
+    // 获取路由参数
+    try {
+      const params = router.getParams() as Record<string, Object>;
+      if (params && params['mode']) {
+        this.isSkillMode = params['mode'] === 'skill';
+        console.log('游戏模式:', this.isSkillMode ? '技能版' : '普通版');
+      }
+    } catch (e) {
+      console.log('获取路由参数失败，使用默认技能模式');
+    }
     this.initBoard();
     console.log('棋盘初始化完成，尺寸:', this.BOARD_SIZE, 'x', this.BOARD_SIZE);
   }
@@ -69,11 +82,20 @@ struct GomokuGame {
   build() {
     Column() {
       // 顶部状态栏
-      Text(this.message)
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 10, bottom: 8 })
-        .fontColor(this.currentPlayer === 1 ? '#000000' : '#666666')
+      Column() {
+        Text(this.message)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.currentPlayer === 1 ? '#2C3E50' : '#7F8C8D')
+        
+        if (this.gameMode !== 'normal') {
+          Text('点击棋盘完成技能施放')
+            .fontSize(12)
+            .fontColor('#E74C3C')
+            .margin({ top: 4 })
+        }
+      }
+      .margin({ top: 15, bottom: 10 })
       
       // 棋盘区域
       Column() {
@@ -88,51 +110,43 @@ struct GomokuGame {
                   .width(this.CELL_SIZE)
                   .height(this.CELL_SIZE)
                   .fill(this.BOARD_COLOR)
-                  .border({ width: 1, color: this.GRID_COLOR })
+                  .border({ width: 0.5, color: this.GRID_COLOR })
                 
                 // 根据棋盘状态显示不同的内容
                 if (this.chessBoard[row][col] === 1) {
                   // 黑棋
                   Circle()
-                    .width(this.CELL_SIZE * 0.8)
-                    .height(this.CELL_SIZE * 0.8)
-                    .fill('#000000')
+                    .width(this.CELL_SIZE * 0.85)
+                    .height(this.CELL_SIZE * 0.85)
+                    .fill('#1a1a1a')
+                    .shadow({ radius: 2, color: 'rgba(0, 0, 0, 0.3)', offsetX: 1, offsetY: 1 })
                 } else if (this.chessBoard[row][col] === 2) {
                   // 白棋
                   Circle()
-                    .width(this.CELL_SIZE * 0.8)
-                    .height(this.CELL_SIZE * 0.8)
+                    .width(this.CELL_SIZE * 0.85)
+                    .height(this.CELL_SIZE * 0.85)
                     .fill('#FFFFFF')
-                    .border({ width: 1, color: '#000000' })
+                    .border({ width: 1, color: '#CCCCCC' })
+                    .shadow({ radius: 2, color: 'rgba(0, 0, 0, 0.2)', offsetX: 1, offsetY: 1 })
                 } else if (this.chessBoard[row][col] === 3) {
                   // 幻影棋子（镜花水月）
                   Circle()
-                    .width(this.CELL_SIZE * 0.8)
-                    .height(this.CELL_SIZE * 0.8)
-                    .fill('rgba(128, 128, 128, 0.5)')
-                    .border({ width: 1, color: '#666666' })
+                    .width(this.CELL_SIZE * 0.85)
+                    .height(this.CELL_SIZE * 0.85)
+                    .fill('rgba(155, 89, 182, 0.6)')
+                    .border({ width: 2, color: '#9B59B6' })
                 } else if (this.chessBoard[row][col] === 4) {
                   // 禁地（画地为牢）
-                  // 红色叉号
                   Column() {
-                    Line()
-                      .width(this.CELL_SIZE * 0.8)
-                      .height(2)
-                      .backgroundColor('#FF0000')
-                      .rotate({ angle: 45 })
-                    
-                    Line()
-                      .width(this.CELL_SIZE * 0.8)
-                      .height(2)
-                      .backgroundColor('#FF0000')
-                      .rotate({ angle: -45 })
+                    Text('✖')
+                      .fontSize(this.CELL_SIZE * 0.6)
+                      .fontColor('#E74C3C')
+                      .fontWeight(FontWeight.Bold)
                   }
                 }
               }
               .width(this.CELL_SIZE)
               .height(this.CELL_SIZE)
-              .backgroundColor('#F0F0F0')
-              .border({ width: 1, color: '#CCCCCC' })
               .onClick(() => {
                 console.log(`点击格子: row=${row}, col=${col}`);
                 this.onGridClick(row, col);
@@ -141,46 +155,95 @@ struct GomokuGame {
           }
         })
       }
-      .border({ width: 1, color: '#000000' })
+      .border({ width: 2, color: '#8B4513' })
       .backgroundColor(this.BOARD_COLOR)
-      .margin({ top: 10, bottom: 10 })
+      .borderRadius(4)
+      .shadow({ radius: 8, color: 'rgba(0, 0, 0, 0.2)', offsetX: 0, offsetY: 4 })
+      .margin({ top: 10, bottom: 15 })
       
       // 游戏控制区域（垂直布局）
-      Column() {
-        // 黑方控制面板
-        this.buildPlayerPanel(0, '黑方', '#000000')
-        
-        // 分隔线
-        Divider()
-          .width('80%')
-          .height(1)
-          .color('#CCCCCC')
-          .margin({ top: 10, bottom: 10 })
-        
-        // 白方控制面板
-        this.buildPlayerPanel(1, '白方', '#FFFFFF')
+      if (this.isSkillMode) {
+        Column() {
+          // 黑方控制面板
+          this.buildPlayerPanel(0, '⬤ 黑方', '#2C3E50')
+          
+          // 白方控制面板
+          this.buildPlayerPanel(1, '⬤ 白方', '#7F8C8D')
+        }
+        .width('100%')
+        .padding({ left: 10, right: 10 })
+      } else {
+        // 普通模式下的简单玩家信息
+        Column() {
+          Row() {
+            Text('⬤ 黑方')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.currentPlayer === 1 ? '#2C3E50' : '#95A5A6')
+            
+            if (this.currentPlayer === 1 && !this.gameOver) {
+              Text(' ▶')
+                .fontSize(14)
+                .fontColor('#27AE60')
+            }
+            
+            Blank()
+            
+            Text('⬤ 白方')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.currentPlayer === 2 ? '#7F8C8D' : '#95A5A6')
+            
+            if (this.currentPlayer === 2 && !this.gameOver) {
+              Text(' ▶')
+                .fontSize(14)
+                .fontColor('#27AE60')
+            }
+          }
+          .width('85%')
+          .padding(15)
+          .backgroundColor('#FFFFFF')
+          .borderRadius(12)
+          .shadow({ radius: 6, color: 'rgba(0, 0, 0, 0.1)', offsetX: 0, offsetY: 2 })
+        }
+        .width('100%')
+        .padding({ left: 10, right: 10 })
       }
-      .width('100%')
-      .padding({ left: 10, right: 10 })
       
       // 重新开始按钮
       if (this.gameOver) {
-        Button('重新开始')
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .width('80%')
-          .height(40)
-          .backgroundColor('#4CAF50')
-          .fontColor('#FFFFFF')
-          .margin({ top: 15 })
-          .onClick(() => {
-            this.initBoard();
-          })
+        Column() {
+          Text(`🎉 ${this.winner === 1 ? '黑方' : '白方'}获胜！`)
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#E74C3C')
+            .margin({ bottom: 15 })
+          
+          Button('🔄 重新开始')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .width('70%')
+            .height(50)
+            .backgroundColor('#4CAF50')
+            .fontColor('#FFFFFF')
+            .borderRadius(25)
+            .shadow({ radius: 6, color: 'rgba(76, 175, 80, 0.4)', offsetX: 0, offsetY: 3 })
+            .onClick(() => {
+              this.initBoard();
+            })
+        }
+        .margin({ top: 20 })
+        .padding(20)
+        .backgroundColor('rgba(255, 255, 255, 0.9)')
+        .borderRadius(16)
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F5F5F5')
+    .linearGradient({
+      angle: 180,
+      colors: [['#E8F5E9', 0.0], ['#F5F5F5', 1.0]]
+    })
     .padding({ left: 5, right: 5, bottom: 10 })
   }
   
@@ -190,53 +253,95 @@ struct GomokuGame {
     Column() {
       // 玩家标识和能量
       Row() {
-        Text(playerName)
-          .fontSize(14)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(playerIndex === 0 ? '#000000' : '#666666')
+        Row() {
+          Text(playerName)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(pieceColor)
+          
+          if (this.currentPlayer === playerIndex + 1 && !this.gameOver) {
+            Text(' ▶')
+              .fontSize(14)
+              .fontColor('#27AE60')
+          }
+        }
         
         Blank()
         
         // 能量进度条
         Row() {
+          Text('⚡')
+            .fontSize(14)
+            .fontColor('#F39C12')
+            .margin({ right: 4 })
+          
           ForEach([0, 1, 2, 3, 4], (item: number) => {
-            Circle()
-              .width(16)
-              .height(16)
-              .fill(item < this.energy[playerIndex] ? '#4CAF50' : '#E0E0E0')
-              .margin({ right: 2 })
+            Stack() {
+              Circle()
+                .width(18)
+                .height(18)
+                .fill(item < this.energy[playerIndex] ? '#F39C12' : '#ECF0F1')
+                .border({ width: 1, color: item < this.energy[playerIndex] ? '#E67E22' : '#BDC3C7' })
+              
+              if (item < this.energy[playerIndex]) {
+                Text('⚡')
+                  .fontSize(10)
+                  .fontColor('#FFFFFF')
+              }
+            }
+            .margin({ right: 3 })
           })
         }
       }
       .width('100%')
-      .margin({ bottom: 8 })
+      .margin({ bottom: 10 })
       
       // 技能按钮（横向排列）
       Row() {
         ForEach(this.skills, (skill: SkillCard, index: number) => {
-          Button(skill.name)
-            .fontSize(9)
-            .fontWeight(FontWeight.Medium)
-            .width(60)
-            .height(30)
-            .margin({ right: 4 })
-            .backgroundColor(this.energy[playerIndex] >= skill.cost ? '#2196F3' : '#BDBDBD')
-            .fontColor('#FFFFFF')
-            .enabled(this.energy[playerIndex] >= skill.cost && this.currentPlayer === playerIndex + 1 && !this.gameOver)
-            .onClick(() => {
-              console.log(`点击技能: ${skill.name}, 能量: ${this.energy[playerIndex]}, 需要: ${skill.cost}`);
-              this.onSkillClick(skill.mode, skill.cost, skill.name);
-            })
+          Column() {
+            Text(skill.name)
+              .fontSize(11)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.energy[playerIndex] >= skill.cost ? '#FFFFFF' : '#95A5A6')
+            
+            Text(`${skill.cost}⚡`)
+              .fontSize(9)
+              .fontColor(this.energy[playerIndex] >= skill.cost ? 'rgba(255, 255, 255, 0.8)' : '#BDC3C7')
+          }
+          .width(65)
+          .height(42)
+          .justifyContent(FlexAlign.Center)
+          .backgroundColor(this.energy[playerIndex] >= skill.cost ? 
+            (index === 0 ? '#9B59B6' : index === 1 ? '#E74C3C' : '#3498DB') : '#ECF0F1')
+          .borderRadius(8)
+          .margin({ right: 5 })
+          .enabled(this.energy[playerIndex] >= skill.cost && this.currentPlayer === playerIndex + 1 && !this.gameOver)
+          .opacity(this.energy[playerIndex] >= skill.cost && this.currentPlayer === playerIndex + 1 ? 1.0 : 0.6)
+          .onClick(() => {
+            console.log(`点击技能: ${skill.name}, 能量: ${this.energy[playerIndex]}, 需要: ${skill.cost}`);
+            this.onSkillClick(skill.mode, skill.cost, skill.name);
+          })
         })
       }
       .width('100%')
       .justifyContent(FlexAlign.Start)
     }
     .width('100%')
-    .padding({ top: 8, bottom: 8, left: 10, right: 10 })
-    .backgroundColor(this.currentPlayer === playerIndex + 1 ? '#E8F5E8' : '#FFFFFF')
-    .border({ width: 2, color: this.currentPlayer === playerIndex + 1 ? '#4CAF50' : '#E0E0E0' })
-    .borderRadius(8)
+    .padding({ top: 12, bottom: 12, left: 15, right: 15 })
+    .backgroundColor(this.currentPlayer === playerIndex + 1 ? '#FFFFFF' : '#F8F9FA')
+    .border({ 
+      width: this.currentPlayer === playerIndex + 1 ? 2 : 1, 
+      color: this.currentPlayer === playerIndex + 1 ? '#27AE60' : '#E0E0E0' 
+    })
+    .borderRadius(12)
+    .shadow({ 
+      radius: this.currentPlayer === playerIndex + 1 ? 8 : 4, 
+      color: this.currentPlayer === playerIndex + 1 ? 'rgba(39, 174, 96, 0.2)' : 'rgba(0, 0, 0, 0.05)', 
+      offsetX: 0, 
+      offsetY: 2 
+    })
+    .margin({ bottom: 10 })
   }
   
   // 处理棋盘格子点击
@@ -277,13 +382,15 @@ struct GomokuGame {
     this.chessBoard = newBoard;
     console.log(`落子成功: 设置(${row},${col})为${this.currentPlayer}`);
     
-    // 增加能量（上限为5）
-    const playerIndex = this.currentPlayer - 1;
-    if (this.energy[playerIndex] < 5) {
-      const newEnergy = [...this.energy];
-      newEnergy[playerIndex] += 1;
-      this.energy = newEnergy;
-      console.log(`能量更新: 玩家${this.currentPlayer}, 能量${this.energy[playerIndex]}`);
+    // 增加能量（仅在技能模式下，上限为5）
+    if (this.isSkillMode) {
+      const playerIndex = this.currentPlayer - 1;
+      if (this.energy[playerIndex] < 5) {
+        const newEnergy = [...this.energy];
+        newEnergy[playerIndex] += 1;
+        this.energy = newEnergy;
+        console.log(`能量更新: 玩家${this.currentPlayer}, 能量${this.energy[playerIndex]}`);
+      }
     }
     
     // 检查胜负（包含幻影棋子）
@@ -362,9 +469,9 @@ struct GomokuGame {
     newBoard[row][col] = 3;
     this.chessBoard = newBoard;
     
-    // 记录幻影棋子，2回合后消失
+    // 记录幻影棋子，3回合后消失
     const key = `${row},${col}`;
-    this.phantomMap.set(key, 2);
+    this.phantomMap.set(key, 3);
     
     // 检查是否获胜（幻影棋子参与判定）
     if (this.checkWinWithPhantom(row, col)) {
