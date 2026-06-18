@@ -114,28 +114,78 @@ struct Index {
         .width('100%')
         .margin({ bottom: 25 })
         
-        // 开始游戏按钮
-        Button(this.selectedMode === 'normal' ? '🎯 开始普通版游戏' : '✨ 开始技能版游戏')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .width('80%')
-          .height(60)
-          .backgroundColor(this.selectedMode === 'normal' ? '#27AE60' : '#9B59B6')
-          .fontColor('#FFFFFF')
-          .borderRadius(30)
-          .shadow({ 
-            radius: 10, 
-            color: this.selectedMode === 'normal' ? 'rgba(39, 174, 96, 0.4)' : 'rgba(155, 89, 182, 0.4)', 
-            offsetX: 0, 
-            offsetY: 5 
-          })
-          .margin({ bottom: 15 })
-          .onClick(() => {
-            router.pushUrl({
-              url: 'pages/GomokuGame',
-              params: { mode: this.selectedMode }
-            });
-          })
+        // 对战模式选择
+        Column() {
+          Text('🎮 选择对战模式')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#2C3E50')
+            .margin({ bottom: 15 })
+          
+          Row() {
+            // 人人对战
+            Column() {
+              Text('👥')
+                .fontSize(32)
+                .margin({ bottom: 8 })
+              
+              Text('本地对战')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#3498DB')
+              
+              Text('双人对战')
+                .fontSize(12)
+                .fontColor('#95A5A6')
+                .margin({ top: 4 })
+            }
+            .width('45%')
+            .padding(15)
+            .backgroundColor('#E3F2FD')
+            .borderRadius(12)
+            .border({ width: 2, color: '#3498DB' })
+            .shadow({ radius: 8, color: 'rgba(52, 152, 219, 0.2)', offsetX: 0, offsetY: 2 })
+            .onClick(() => {
+              router.pushUrl({
+                url: 'pages/LocalBattlePage'
+              });
+            })
+            
+            Blank().width('10%')
+            
+            // 人机对战
+            Column() {
+              Text('🤖')
+                .fontSize(32)
+                .margin({ bottom: 8 })
+              
+              Text('人机对战')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#E74C3C')
+              
+              Text('挑战AI')
+                .fontSize(12)
+                .fontColor('#95A5A6')
+                .margin({ top: 4 })
+            }
+            .width('45%')
+            .padding(15)
+            .backgroundColor('#FFEBEE')
+            .borderRadius(12)
+            .border({ width: 2, color: '#E74C3C' })
+            .shadow({ radius: 8, color: 'rgba(231, 76, 60, 0.2)', offsetX: 0, offsetY: 2 })
+            .onClick(() => {
+              router.pushUrl({
+                url: 'pages/AIBattlePage'
+              });
+            })
+          }
+          .width('85%')
+          .justifyContent(FlexAlign.Center)
+        }
+        .width('100%')
+        .margin({ bottom: 25 })
         
         Button('🧪 测试页面')
           .fontSize(18)

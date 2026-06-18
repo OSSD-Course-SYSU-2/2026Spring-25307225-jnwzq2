@@ -8,17 +8,53 @@ interface SkillCard {
   desc: string;
 }
 
+// 幻影棋子数据类型定义
+interface PhantomData {
+  player: number;  // 玩家：1-黑方，2-白方
+  timer: number;   // 倒计时
+}
+
+// AI落子候选位置
+interface AIMoveCandidate {
+  row: number;
+  col: number;
+  score: number;
+}
+
+// AI落子结果
+interface AIMove {
+  row: number;
+  col: number;
+}
+
+// 连线分析结果
+interface LineAnalysis {
+  count: number;
+  openEnds: number;
+}
+
+// 连线计数结果
+interface LineCount {
+  count: number;
+}
+
+// 上一步棋子位置
+interface LastMove {
+  row: number;
+  col: number;
+}
+
 @Entry
 @Component
 struct GomokuGame {
   // 棋盘常量
-  private readonly BOARD_SIZE: number = 15; // 15x15 棋盘
-  private readonly CELL_SIZE: number = 22;  // 每个格子大小（适配手机屏幕）
+  private readonly BOARD_SIZE: number = 18; // 18x18 棋盘
+  private readonly CELL_SIZE: number = 18;  // 每个格子大小
   private readonly BOARD_COLOR: string = '#DEB887'; // 木纹色
   private readonly GRID_COLOR: string = '#8B4513';  // 棕色网格线
   
   // 游戏状态
-  @State chessBoard: number[][] = []; // 棋盘数组 0:空 1:黑棋 2:白棋 3:幻影 4:禁地
+  @State chessBoard: number[][] = []; // 棋盘数组 0:空 1:黑棋 2:白棋 3:保留 4:禁地 5:黑方幻影 6:白方幻影
   @State currentPlayer: number = 1; // 1:黑方 2:白方
   @State energy: number[] = [0, 0]; // [黑方能量, 白方能量]
   @State gameMode: string = 'normal'; // 'normal', 'skill_fly', 'skill_mirror', 'skill_prison'
@@ -26,6 +62,10 @@ struct GomokuGame {
   @State gameOver: boolean = false;
   @State winner: number = 0;
   @State isSkillMode: boolean = true; // 是否为技能模式（true:技能版 false:普通版）
+  @State isAIBattle: boolean = false; // 是否为人机对战
+  @State aiDifficulty: string = 'medium'; // AI难度: 'easy', 'medium', 'hard'
+  @State isAIThinking: boolean = false; // AI是否正在思考
+  @State lastMove: LastMove | null = null; // 上一步棋子位置（用于标识）
   
   // 技能卡牌数据
   private readonly skills: SkillCard[] = [
@@ -36,8 +76,8 @@ struct GomokuGame {
   
   // 禁地倒计时记录
   private forbiddenMap: Map<string, number> = new Map();
-  // 幻影棋子倒计时记录（3回合后消失）
-  private phantomMap: Map<string, number> = new Map();
+  // 幻影棋子倒计时记录（包含玩家信息和倒计时）
+  private phantomMap: Map<string, PhantomData> = new Map();
   
   // 初始化棋盘
   aboutToAppear(): void {
@@ -48,6 +88,14 @@ struct GomokuGame {
       if (params && params['mode']) {
         this.isSkillMode = params['mode'] === 'skill';
         console.log('游戏模式:', this.isSkillMode ? '技能版' : '普通版');
+      }
+      if (params && params['battleType']) {
+        this.isAIBattle = params['battleType'] === 'ai';
+        console.log('对战模式:', this.isAIBattle ? '人机对战' : '本地对战');
+      }
+      if (params && params['difficulty']) {
+        this.aiDifficulty = params['difficulty'] as string;
+        console.log('AI难度:', this.aiDifficulty);
       }
     } catch (e) {
       console.log('获取路由参数失败，使用默认技能模式');
@@ -73,6 +121,7 @@ struct GomokuGame {
     this.message = '黑方落子';
     this.gameOver = false;
     this.winner = 0;
+    this.lastMove = null; // 重置上一步标识
     this.forbiddenMap.clear();
     this.phantomMap.clear();
     console.log('棋盘数组初始化完成，长度:', this.chessBoard.length);
@@ -100,9 +149,9 @@ struct GomokuGame {
       // 棋盘区域
       Column() {
         // 棋盘网格
-        ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], (row: number) => {
+        ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], (row: number) => {
           Row() {
-            ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], (col: number) => {
+            ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], (col: number) => {
               // 棋盘格子
               Stack() {
                 // 棋盘格子背景
@@ -115,26 +164,53 @@ struct GomokuGame {
                 // 根据棋盘状态显示不同的内容
                 if (this.chessBoard[row][col] === 1) {
                   // 黑棋
-                  Circle()
-                    .width(this.CELL_SIZE * 0.85)
-                    .height(this.CELL_SIZE * 0.85)
-                    .fill('#1a1a1a')
-                    .shadow({ radius: 2, color: 'rgba(0, 0, 0, 0.3)', offsetX: 1, offsetY: 1 })
+                  Stack() {
+                    Circle()
+                      .width(this.CELL_SIZE * 0.85)
+                      .height(this.CELL_SIZE * 0.85)
+                      .fill('#1a1a1a')
+                      .shadow({ radius: 2, color: 'rgba(0, 0, 0, 0.3)', offsetX: 1, offsetY: 1 })
+                    // 上一步标识（红色圆点）
+                    if (this.lastMove && this.lastMove.row === row && this.lastMove.col === col) {
+                      Circle()
+                        .width(this.CELL_SIZE * 0.3)
+                        .height(this.CELL_SIZE * 0.3)
+                        .fill('#E74C3C')
+                    }
+                  }
                 } else if (this.chessBoard[row][col] === 2) {
                   // 白棋
+                  Stack() {
+                    Circle()
+                      .width(this.CELL_SIZE * 0.85)
+                      .height(this.CELL_SIZE * 0.85)
+                      .fill('#FFFFFF')
+                      .border({ width: 1, color: '#CCCCCC' })
+                      .shadow({ radius: 2, color: 'rgba(0, 0, 0, 0.2)', offsetX: 1, offsetY: 1 })
+                    // 上一步标识（红色圆点）
+                    if (this.lastMove && this.lastMove.row === row && this.lastMove.col === col) {
+                      Circle()
+                        .width(this.CELL_SIZE * 0.3)
+                        .height(this.CELL_SIZE * 0.3)
+                        .fill('#E74C3C')
+                    }
+                  }
+                } else if (this.chessBoard[row][col] === 5) {
+                  // 黑方幻影棋子（镜花水月）
                   Circle()
                     .width(this.CELL_SIZE * 0.85)
                     .height(this.CELL_SIZE * 0.85)
-                    .fill('#FFFFFF')
-                    .border({ width: 1, color: '#CCCCCC' })
-                    .shadow({ radius: 2, color: 'rgba(0, 0, 0, 0.2)', offsetX: 1, offsetY: 1 })
-                } else if (this.chessBoard[row][col] === 3) {
-                  // 幻影棋子（镜花水月）
+                    .fill('rgba(44, 62, 80, 0.5)')  // 深色半透明
+                    .border({ width: 2, color: '#2C3E50' })  // 黑色边框
+                    .shadow({ radius: 3, color: 'rgba(44, 62, 80, 0.4)', offsetX: 0, offsetY: 0 })
+                } else if (this.chessBoard[row][col] === 6) {
+                  // 白方幻影棋子（镜花水月）
                   Circle()
                     .width(this.CELL_SIZE * 0.85)
                     .height(this.CELL_SIZE * 0.85)
-                    .fill('rgba(155, 89, 182, 0.6)')
-                    .border({ width: 2, color: '#9B59B6' })
+                    .fill('rgba(236, 240, 241, 0.7)')  // 浅色半透明
+                    .border({ width: 2, color: '#ECF0F1' })  // 白色边框
+                    .shadow({ radius: 3, color: 'rgba(236, 240, 241, 0.4)', offsetX: 0, offsetY: 0 })
                 } else if (this.chessBoard[row][col] === 4) {
                   // 禁地（画地为牢）
                   Column() {
@@ -228,14 +304,43 @@ struct GomokuGame {
             .fontColor('#FFFFFF')
             .borderRadius(25)
             .shadow({ radius: 6, color: 'rgba(76, 175, 80, 0.4)', offsetX: 0, offsetY: 3 })
+            .margin({ bottom: 10 })
             .onClick(() => {
               this.initBoard();
+            })
+          
+          Button('🚪 退出游戏')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .width('70%')
+            .height(50)
+            .backgroundColor('#95A5A6')
+            .fontColor('#FFFFFF')
+            .borderRadius(25)
+            .shadow({ radius: 6, color: 'rgba(149, 165, 166, 0.4)', offsetX: 0, offsetY: 3 })
+            .onClick(() => {
+              router.back();
             })
         }
         .margin({ top: 20 })
         .padding(20)
         .backgroundColor('rgba(255, 255, 255, 0.9)')
         .borderRadius(16)
+      } else {
+        // 游戏进行中的退出按钮
+        Button('🚪 退出游戏')
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .width('70%')
+          .height(45)
+          .backgroundColor('#95A5A6')
+          .fontColor('#FFFFFF')
+          .borderRadius(22)
+          .shadow({ radius: 4, color: 'rgba(149, 165, 166, 0.3)', offsetX: 0, offsetY: 2 })
+          .margin({ top: 15 })
+          .onClick(() => {
+            router.back();
+          })
       }
     }
     .width('100%')
@@ -348,6 +453,12 @@ struct GomokuGame {
   onGridClick(row: number, col: number): void {
     if (this.gameOver) return;
     
+    // AI思考时禁止玩家操作
+    if (this.isAIThinking) {
+      console.log('AI正在思考，请等待...');
+      return;
+    }
+    
     // 根据游戏模式处理点击
     switch (this.gameMode) {
       case 'normal':
@@ -382,6 +493,10 @@ struct GomokuGame {
     this.chessBoard = newBoard;
     console.log(`落子成功: 设置(${row},${col})为${this.currentPlayer}`);
     
+    // 记录上一步位置
+    const move: LastMove = { row, col };
+    this.lastMove = move;
+    
     // 增加能量（仅在技能模式下，上限为5）
     if (this.isSkillMode) {
       const playerIndex = this.currentPlayer - 1;
@@ -407,6 +522,11 @@ struct GomokuGame {
     
     // 处理幻影棋子和禁地倒计时
     this.processTurnCountdown();
+    
+    // 如果是人机对战且轮到AI（白方），触发AI落子
+    if (this.isAIBattle && this.currentPlayer === 2 && !this.gameOver) {
+      this.triggerAIMove();
+    }
   }
   
   // 技能按钮点击事件
@@ -432,20 +552,26 @@ struct GomokuGame {
     this.message = `${this.currentPlayer === 1 ? '黑方' : '白方'}正在施放[${skillName}]...`;
   }
   
-  // 处理技能：飞沙走石 - 移除棋子
+  // 处理技能：飞沙走石 - 移除棋子或禁地
   handleSkillFly(row: number, col: number): void {
     const cellValue = this.chessBoard[row][col];
     
-    // 只能移除黑棋或白棋（不能移除空位、幻影或禁地）
-    if (cellValue !== 1 && cellValue !== 2) {
+    // 可以移除黑棋(1)、白棋(2)或禁地(4)，但不能移除空位(0)或幻影棋子(5,6)
+    if (cellValue === 0 || cellValue === 5 || cellValue === 6) {
       return;
     }
     
-    // 移除棋子 - 创建新数组以触发UI更新
+    // 移除棋子或禁地 - 创建新数组以触发UI更新
     const newBoard = [...this.chessBoard];
     newBoard[row] = [...newBoard[row]];
     newBoard[row][col] = 0;
     this.chessBoard = newBoard;
+    
+    // 如果移除的是禁地，需要从forbiddenMap中删除记录
+    if (cellValue === 4) {
+      const key = `${row},${col}`;
+      this.forbiddenMap.delete(key);
+    }
     
     // 强制切换回合
     this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
@@ -463,15 +589,19 @@ struct GomokuGame {
       return;
     }
     
+    // 根据当前玩家设置幻影棋子值（黑方为5，白方为6）
+    const phantomValue = this.currentPlayer === 1 ? 5 : 6;
+    
     // 放置幻影棋子 - 创建新数组以触发UI更新
     const newBoard = [...this.chessBoard];
     newBoard[row] = [...newBoard[row]];
-    newBoard[row][col] = 3;
+    newBoard[row][col] = phantomValue;
     this.chessBoard = newBoard;
     
-    // 记录幻影棋子，3回合后消失
+    // 记录幻影棋子，包含玩家信息和倒计时
     const key = `${row},${col}`;
-    this.phantomMap.set(key, 3);
+    const phantomData: PhantomData = { player: this.currentPlayer, timer: 3 };
+    this.phantomMap.set(key, phantomData);
     
     // 检查是否获胜（幻影棋子参与判定）
     if (this.checkWinWithPhantom(row, col)) {
@@ -552,6 +682,384 @@ struct GomokuGame {
     }
   }
   
+  // ==================== AI 相关方法 ====================
+  
+  // 触发AI落子（异步延迟，模拟思考时间）
+  triggerAIMove(): void {
+    this.isAIThinking = true;
+    this.message = 'AI思考中...';
+    
+    // 根据难度设置思考时间
+    const thinkTime = this.aiDifficulty === 'easy' ? 300 : 
+                      this.aiDifficulty === 'medium' ? 500 : 800;
+    
+    // 使用setTimeout模拟异步思考
+    setTimeout(() => {
+      this.performAIMove();
+      this.isAIThinking = false;
+    }, thinkTime);
+  }
+  
+  // 执行AI落子
+  performAIMove(): void {
+    if (this.gameOver) return;
+    
+    // AI决策：先考虑使用技能，再考虑落子
+    if (this.isSkillMode && this.shouldAIUseSkill()) {
+      return; // 如果使用了技能，直接返回
+    }
+    
+    // AI落子
+    const move = this.getBestAIMove();
+    if (move) {
+      this.executeAIMove(move.row, move.col);
+    }
+  }
+  
+  // AI判断是否应该使用技能
+  shouldAIUseSkill(): boolean {
+    const aiEnergy = this.energy[1]; // AI是白方，索引为1
+    
+    // 困难模式更积极使用技能
+    const useSkillChance = this.aiDifficulty === 'easy' ? 0.1 : 
+                           this.aiDifficulty === 'medium' ? 0.3 : 0.5;
+    
+    // 随机决定是否尝试使用技能
+    if (Math.random() > useSkillChance) return false;
+    
+    // 尝试使用画地为牢（2能量）- 封锁对手的关键位置
+    if (aiEnergy >= 2) {
+      const blockPos = this.findBestBlockPosition();
+      if (blockPos) {
+        this.executeAISkillPrison(blockPos.row, blockPos.col);
+        return true;
+      }
+    }
+    
+    // 尝试使用飞沙走石（4能量）- 移除对手的关键棋子
+    if (aiEnergy >= 4) {
+      const removePos = this.findBestRemovePosition();
+      if (removePos) {
+        this.executeAISkillFly(removePos.row, removePos.col);
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  // 获取最佳AI落子位置
+  getBestAIMove(): AIMove | null {
+    const candidates: AIMoveCandidate[] = [];
+    
+    // 遍历所有空位，计算得分
+    for (let row = 0; row < this.BOARD_SIZE; row++) {
+      for (let col = 0; col < this.BOARD_SIZE; col++) {
+        if (this.chessBoard[row][col] === 0) { // 空位
+          const score = this.evaluatePosition(row, col);
+          candidates.push({ row, col, score });
+        }
+      }
+    }
+    
+    if (candidates.length === 0) return null;
+    
+    // 根据难度选择落子
+    candidates.sort((a: AIMoveCandidate, b: AIMoveCandidate) => b.score - a.score);
+    
+    if (this.aiDifficulty === 'easy') {
+      // 简单模式：随机选择前5个候选位置
+      const topN = Math.min(5, candidates.length);
+      const randomIndex = Math.floor(Math.random() * topN);
+      const result: AIMove = { row: candidates[randomIndex].row, col: candidates[randomIndex].col };
+      return result;
+    } else if (this.aiDifficulty === 'medium') {
+      // 中等模式：随机选择前3个候选位置
+      const topN = Math.min(3, candidates.length);
+      const randomIndex = Math.floor(Math.random() * topN);
+      const result: AIMove = { row: candidates[randomIndex].row, col: candidates[randomIndex].col };
+      return result;
+    } else {
+      // 困难模式：选择最佳位置
+      const result: AIMove = { row: candidates[0].row, col: candidates[0].col };
+      return result;
+    }
+  }
+  
+  // 评估位置得分
+  evaluatePosition(row: number, col: number): number {
+    let score = 0;
+    
+    // 评估AI（白方）在该位置的进攻价值
+    score += this.evaluatePositionForPlayer(row, col, 2) * 1.1; // 进攻略优先
+    
+    // 评估阻挡对手（黑方）的价值
+    score += this.evaluatePositionForPlayer(row, col, 1) * 1.0;
+    
+    // 中心位置加分
+    const centerDist = Math.abs(row - 7) + Math.abs(col - 7);
+    score += (14 - centerDist) * 2;
+    
+    return score;
+  }
+  
+  // 评估某位置对特定玩家的价值
+  evaluatePositionForPlayer(row: number, col: number, player: number): number {
+    let score = 0;
+    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    
+    for (const dir of directions) {
+      const lineInfo = this.analyzeLine(row, col, dir[0], dir[1], player);
+      
+      // 根据连子数和空位数评分
+      if (lineInfo.count >= 4) {
+        score += 10000; // 成五
+      } else if (lineInfo.count === 3 && lineInfo.openEnds === 2) {
+        score += 5000; // 活四
+      } else if (lineInfo.count === 3 && lineInfo.openEnds === 1) {
+        score += 1000; // 冲四
+      } else if (lineInfo.count === 2 && lineInfo.openEnds === 2) {
+        score += 500; // 活三
+      } else if (lineInfo.count === 2 && lineInfo.openEnds === 1) {
+        score += 100; // 眠三
+      } else if (lineInfo.count === 1 && lineInfo.openEnds === 2) {
+        score += 50; // 活二
+      } else if (lineInfo.count === 1 && lineInfo.openEnds === 1) {
+        score += 10; // 眠二
+      }
+    }
+    
+    return score;
+  }
+  
+  // 分析某方向的连线情况
+  analyzeLine(row: number, col: number, dx: number, dy: number, player: number): LineAnalysis {
+    let count = 0;
+    let openEnds = 0;
+    
+    // 正向检查
+    for (let i = 1; i < 5; i++) {
+      const newRow = row + i * dx;
+      const newCol = col + i * dy;
+      if (this.isOutOfBounds(newRow, newCol)) break;
+      
+      const cell = this.chessBoard[newRow][newCol];
+      if (cell === player || cell === (player === 1 ? 5 : 6)) {
+        count++;
+      } else if (cell === 0) {
+        openEnds++;
+        break;
+      } else {
+        break;
+      }
+    }
+    
+    // 反向检查
+    for (let i = 1; i < 5; i++) {
+      const newRow = row - i * dx;
+      const newCol = col - i * dy;
+      if (this.isOutOfBounds(newRow, newCol)) break;
+      
+      const cell = this.chessBoard[newRow][newCol];
+      if (cell === player || cell === (player === 1 ? 5 : 6)) {
+        count++;
+      } else if (cell === 0) {
+        openEnds++;
+        break;
+      } else {
+        break;
+      }
+    }
+    
+    const result: LineAnalysis = { count, openEnds };
+    return result;
+  }
+  
+  // 检查是否越界
+  isOutOfBounds(row: number, col: number): boolean {
+    return row < 0 || row >= this.BOARD_SIZE || col < 0 || col >= this.BOARD_SIZE;
+  }
+  
+  // 执行AI落子
+  executeAIMove(row: number, col: number): void {
+    console.log(`AI落子: row=${row}, col=${col}`);
+    
+    // 落子
+    const newBoard = [...this.chessBoard];
+    newBoard[row] = [...newBoard[row]];
+    newBoard[row][col] = 2; // AI是白方
+    this.chessBoard = newBoard;
+    
+    // 增加能量
+    // 记录上一步位置
+    this.lastMove = { row: row, col: col };
+    if (this.isSkillMode && this.energy[1] < 5) {
+      const newEnergy = [...this.energy];
+      newEnergy[1] += 1;
+      this.energy = newEnergy;
+    }
+    
+    // 检查胜负
+    if (this.checkWinWithPhantom(row, col)) {
+      this.gameOver = true;
+      this.winner = 2;
+      this.message = 'AI获胜！';
+      return;
+    }
+    
+    // 切换回玩家
+    this.currentPlayer = 1;
+    this.message = '黑方落子';
+    
+    // 处理倒计时
+    this.processTurnCountdown();
+  }
+  
+  // 找到最佳封锁位置（画地为牢）
+  findBestBlockPosition(): AIMove | null {
+    // 寻找对手可能形成连珠的关键位置
+    let bestPos: AIMoveCandidate | null = null;
+    
+    for (let row = 0; row < this.BOARD_SIZE; row++) {
+      for (let col = 0; col < this.BOARD_SIZE; col++) {
+        if (this.chessBoard[row][col] === 0) {
+          const score = this.evaluatePositionForPlayer(row, col, 1); // 评估对黑方的价值
+          const current: AIMoveCandidate = { row, col, score };
+          if (!bestPos || score > bestPos.score) {
+            bestPos = current;
+          }
+        }
+      }
+    }
+    
+    // 只有得分足够高才封锁
+    if (bestPos && bestPos.score > 500) {
+      const result: AIMove = { row: bestPos.row, col: bestPos.col };
+      return result;
+    }
+    return null;
+  }
+  
+  // 找到最佳移除位置（飞沙走石）
+  findBestRemovePosition(): AIMove | null {
+    // 寻找对手的关键棋子
+    let bestPos: AIMoveCandidate | null = null;
+    
+    for (let row = 0; row < this.BOARD_SIZE; row++) {
+      for (let col = 0; col < this.BOARD_SIZE; col++) {
+        const cell = this.chessBoard[row][col];
+        if (cell === 1) { // 黑棋
+          const score = this.evaluatePieceImportance(row, col, 1);
+          const current: AIMoveCandidate = { row, col, score };
+          if (!bestPos || score > bestPos.score) {
+            bestPos = current;
+          }
+        }
+      }
+    }
+    
+    // 只有重要性足够高才移除
+    if (bestPos && bestPos.score > 1000) {
+      const result: AIMove = { row: bestPos.row, col: bestPos.col };
+      return result;
+    }
+    return null;
+  }
+  
+  // 评估棋子的重要性
+  evaluatePieceImportance(row: number, col: number, player: number): number {
+    let score = 0;
+    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    
+    for (const dir of directions) {
+      const lineInfo = this.countLineWithPiece(row, col, dir[0], dir[1], player);
+      if (lineInfo.count >= 3) {
+        score += lineInfo.count * 1000;
+      } else if (lineInfo.count >= 2) {
+        score += lineInfo.count * 100;
+      }
+    }
+    
+    return score;
+  }
+  
+  // 计算包含指定棋子的连线数
+  countLineWithPiece(row: number, col: number, dx: number, dy: number, player: number): LineCount {
+    let count = 1;
+    
+    // 正向
+    for (let i = 1; i < 5; i++) {
+      const newRow = row + i * dx;
+      const newCol = col + i * dy;
+      if (this.isOutOfBounds(newRow, newCol)) break;
+      if (this.chessBoard[newRow][newCol] === player) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    
+    // 反向
+    for (let i = 1; i < 5; i++) {
+      const newRow = row - i * dx;
+      const newCol = col - i * dy;
+      if (this.isOutOfBounds(newRow, newCol)) break;
+      if (this.chessBoard[newRow][newCol] === player) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    
+    const result: LineCount = { count };
+    return result;
+  }
+  
+  // AI执行画地为牢技能
+  executeAISkillPrison(row: number, col: number): void {
+    console.log(`AI使用画地为牢: row=${row}, col=${col}`);
+    
+    // 扣除能量
+    const newEnergy = [...this.energy];
+    newEnergy[1] -= 2;
+    this.energy = newEnergy;
+    
+    // 设置禁地
+    const newBoard = [...this.chessBoard];
+    newBoard[row] = [...newBoard[row]];
+    newBoard[row][col] = 4;
+    this.chessBoard = newBoard;
+    
+    const key = `${row},${col}`;
+    this.forbiddenMap.set(key, 6);
+    
+    // 切换回玩家
+    this.currentPlayer = 1;
+    this.message = '黑方落子';
+    this.processTurnCountdown();
+  }
+  
+  // AI执行飞沙走石技能
+  executeAISkillFly(row: number, col: number): void {
+    console.log(`AI使用飞沙走石: row=${row}, col=${col}`);
+    
+    // 扣除能量
+    const newEnergy = [...this.energy];
+    newEnergy[1] -= 4;
+    this.energy = newEnergy;
+    
+    // 移除棋子
+    const newBoard = [...this.chessBoard];
+    newBoard[row] = [...newBoard[row]];
+    newBoard[row][col] = 0;
+    this.chessBoard = newBoard;
+    
+    // 切换回玩家
+    this.currentPlayer = 1;
+    this.message = '黑方落子';
+    this.processTurnCountdown();
+  }
+  
   // 统计棋盘上的棋子数量（用于调试）
   countPieces(): number {
     let count = 0;
@@ -593,8 +1101,11 @@ struct GomokuGame {
         }
         
         const cell = this.chessBoard[newRow][newCol];
-        // 计算玩家自己的棋子或幻影棋子(3)，忽略禁地(4)
-        if (cell === player || cell === 3) {
+        // 计算玩家自己的棋子或对应幻影棋子，忽略禁地(4)
+        // 黑方(player=1)可以连接黑棋(1)和黑方幻影(5)
+        // 白方(player=2)可以连接白棋(2)和白方幻影(6)
+        const phantomValue = player === 1 ? 5 : 6;
+        if (cell === player || cell === phantomValue) {
           count++;
         } else {
           break;
@@ -611,8 +1122,11 @@ struct GomokuGame {
         }
         
         const cell = this.chessBoard[newRow][newCol];
-        // 计算玩家自己的棋子或幻影棋子(3)，忽略禁地(4)
-        if (cell === player || cell === 3) {
+        // 计算玩家自己的棋子或对应幻影棋子，忽略禁地(4)
+        // 黑方(player=1)可以连接黑棋(1)和黑方幻影(5)
+        // 白方(player=2)可以连接白棋(2)和白方幻影(6)
+        const phantomValue = player === 1 ? 5 : 6;
+        if (cell === player || cell === phantomValue) {
           count++;
         } else {
           break;
@@ -643,8 +1157,8 @@ struct GomokuGame {
     const newBoard = [...this.chessBoard];
     let boardUpdated = false;
     
-    this.phantomMap.forEach((timer: number, key: string) => {
-      const newTimer = timer - 1;
+    this.phantomMap.forEach((data: PhantomData, key: string) => {
+      const newTimer = data.timer - 1;
       
       if (newTimer <= 0) {
         // 倒计时结束，移除幻影棋子
@@ -656,8 +1170,9 @@ struct GomokuGame {
         newBoard[row][col] = 0;
         boardUpdated = true;
       } else {
-        // 更新倒计时
-        this.phantomMap.set(key, newTimer);
+        // 更新倒计时，保留玩家信息
+        const newData: PhantomData = { player: data.player, timer: newTimer };
+        this.phantomMap.set(key, newData);
       }
     });
     

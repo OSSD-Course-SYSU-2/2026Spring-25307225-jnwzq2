@@ -1,3 +1,4 @@
+import router from '@ohos.router';
 /*
 * Copyright (c) 2024 Huawei Device Co., Ltd.
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,7 +81,14 @@ export struct GameModeSelectionModule {
                   })
                 }
                 .onClick(() => {
-                  this.jump("GameModeSelectionModuleDetail" + index.toString())
+                  // 根据索引跳转到不同的页面
+                  if (index === 0) {
+                    // 本地对战
+                    router.pushUrl({ url: 'pages/LocalBattlePage' });
+                  } else if (index === 1) {
+                    // 人机对战
+                    router.pushUrl({ url: 'pages/AIBattlePage' });
+                  }
                 })
               },
               (item: DataSource, index: number) => index + JSON.stringify(item)) //ITEM_MODEL
